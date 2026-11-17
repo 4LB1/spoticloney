@@ -1,7 +1,8 @@
+import { useState } from "react";
 import {
   View,
   Text,
-  ScrollView,
+  FlatList,
   Pressable,
   SafeAreaView,
   StyleSheet,
@@ -13,44 +14,24 @@ import { MiniPlayer } from "../components/MiniPlayer";
 
 type Props = NativeStackScreenProps<RootStackParamList, "Home">;
 
-const recommendedTracks = [
-  {
-    id: "1",
-    title: "Follow the Leader",
-    author: "Korn",
-    imageUrl: "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcTCva-w-oDVHKWpg90Rh8TUnY1_GnzxoDnlLam-8ItqcQ&s=10",
-  },
-  {
-    id: "2",
-    title: "The Dark Side",
-    author: "Pink Floyd",
-    imageUrl: "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcRMVfxsRuGrLq7PIL5RD9J85M9uw1NoAaIIB7BQHHLuOw&s",
-  },
-  {
-    id: "3",
-    title: "In the Court",
-    author: "King Crimson",
-    imageUrl: "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcQZnBrlb5wdUZBa7yClvwXzlub6DmKVHGzhwefXG1QGSA&s=10",
-  },
-  {
-    id: "4",
-    title: "Meteora",
-    author: "Linkin Park",
-    imageUrl: "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcSKNeoTxUk1C1NYsqfLxJDMsZLCnb8wipMzymny-IuAAA&s=10",
-  },
-  {
-    id: "5",
-    title: "Awake and alive",
-    author: "Skillet",
-    imageUrl: "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcS-zSfKrJ8rKhrUoDOIA8Nywknya1HC-DihMM0Q_d79Cw&s",
-  },
-];
-
 export function HomeScreen({ navigation }: Props) {
+  const [favoriteIds, setFavoriteIds] = useState<string[]>([]);
+  const [activeTab, setActiveTab] = useState<"all" | "favorites">("all");
+
+  function toggleFavorite(id: string) {
+    setFavoriteIds((prev) =>
+      prev.includes(id) ? prev.filter((favId) => favId !== id) : [...prev, id]
+    );
+  }
+
+  const visibleTracks =
+    activeTab === "all"
+      ? recommendedTracks
+      : recommendedTracks.filter((track) => favoriteIds.includes(track.id));
+
   return (
     <SafeAreaView style={styles.safeArea}>
       <View style={styles.container}>
-        {/* Верхняя панель навигации и фильтров */}
         <View style={styles.topBar}>
           <View style={styles.leftControls}>
             <Pressable
@@ -60,13 +41,50 @@ export function HomeScreen({ navigation }: Props) {
               <Text style={styles.avatarIcon}>👤</Text>
             </Pressable>
 
-            <View style={styles.chipActive}>
-              <Text style={styles.chipTextActive}>All</Text>
-            </View>
+            <Pressable
+              style={activeTab === "all" ? styles.chipActive : styles.chipInactive}
+              onPress={() => setActiveTab("all")}
+            >
+              <Text
+                style={
+                  activeTab === "all"
+                    ? styles.chipTextActive
+                    : styles.chipTextInactive
+                }
+              >
+                Все
+              </Text>
+            </Pressable>
 
-            <View style={styles.chipInactive}>
-              <Text style={styles.chipTextInactive}>Music</Text>
-            </View>
+            <Pressable
+              style={
+                activeTab === "favorites"
+                  ? styles.chipActive
+                  : styles.chipInactive
+              }
+              onPress={() => setActiveTab("favorites")}
+            >
+              <Text
+                style={
+                  activeTab === "favorites"
+                    ? styles.chipTextActive
+                    : styles.chipTextInactive
+                }
+              >
+                Избранное
+              </Text>
+              {favoriteIds.length > 0 && (
+                <Text
+                  style={
+                    activeTab === "favorites"
+                      ? styles.chipTextActive
+                      : styles.chipTextInactive
+                  }
+                >
+                  {" "}({favoriteIds.length})
+                </Text>
+              )}
+            </Pressable>
           </View>
 
           <Pressable
@@ -77,35 +95,41 @@ export function HomeScreen({ navigation }: Props) {
           </Pressable>
         </View>
 
-        {/* Основной контент со списком через map */}
         <View style={styles.content}>
-          <Text style={styles.sectionTitle}>Рекоммендации</Text>
+          <Text style={styles.sectionTitle}>Рекомендации</Text>
 
-          <ScrollView
+          <FlatList
             horizontal
+            data={visibleTracks}
+            keyExtractor={(item) => item.id}
             showsHorizontalScrollIndicator={false}
-            contentContainerStyle={styles.horizontalList}
-          >
-            {recommendedTracks.map((track) => (
-              <Pressable
-                key={track.id}
-                onPress={() => navigation.navigate("Player")}
-              >
+            contentContainerStyle={[
+              styles.horizontalList,
+              visibleTracks.length === 0 && styles.emptyListContainer,
+            ]}
+            renderItem={({ item }) => (
+              <Pressable onPress={() => navigation.navigate("Player")}>
                 <TrackCard
-                  title={track.title}
-                  author={track.author}
-                  imageUrl={track.imageUrl}
+                  title={item.title}
+                  author={item.author}
+                  imageUrl={item.imageUrl}
+                  isFavorite={favoriteIds.includes(item.id)}
+                  onToggleFavorite={() => toggleFavorite(item.id)}
                 />
               </Pressable>
-            ))}
-          </ScrollView>
+            )}
+            ListEmptyComponent={
+              <Text style={styles.emptyText}>
+                Пока нет избранных треков — нажмите ♡ на карточке.
+              </Text>
+            }
+          />
         </View>
 
-        {/* Нижний мини-плеер */}
         <MiniPlayer
-          title="Follow the leader"
-          author="Korn"
-          imageUrl=""
+          title="Название"
+          author="Автор"
+          imageUrl="https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcTCva-w-oDVHKWpg90Rh8TUnY1_GnzxoDnlLam-8ItqcQ&s=10"
           onPress={() => navigation.navigate("Player")}
         />
       </View>
@@ -147,6 +171,8 @@ const styles = StyleSheet.create({
     color: "#171717",
   },
   chipActive: {
+    flexDirection: "row",
+    alignItems: "center",
     backgroundColor: "#6100C5",
     paddingHorizontal: 16,
     paddingVertical: 8,
@@ -158,6 +184,8 @@ const styles = StyleSheet.create({
     fontWeight: "600",
   },
   chipInactive: {
+    flexDirection: "row",
+    alignItems: "center",
     borderWidth: 1,
     borderColor: "#525252",
     paddingHorizontal: 16,
@@ -189,4 +217,48 @@ const styles = StyleSheet.create({
   horizontalList: {
     paddingRight: 16,
   },
+  emptyListContainer: {
+    flexGrow: 1,
+    justifyContent: "center",
+    paddingRight: 16,
+  },
+  emptyText: {
+    color: "#9A9A9A",
+    fontSize: 15,
+    maxWidth: 280,
+    lineHeight: 22,
+  },
 });
+
+const recommendedTracks = [
+  {
+    id: "1",
+    title: "Follow the Leader",
+    author: "Korn",
+    imageUrl: "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcTCva-w-oDVHKWpg90Rh8TUnY1_GnzxoDnlLam-8ItqcQ&s=10",
+  },
+  {
+    id: "2",
+    title: "The Dark Side",
+    author: "Pink Floyd",
+    imageUrl: "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcRMVfxsRuGrLq7PIL5RD9J85M9uw1NoAaIIB7BQHHLuOw&s",
+  },
+  {
+    id: "3",
+    title: "In the Court",
+    author: "King Crimson",
+    imageUrl: "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcQZnBrlb5wdUZBa7yClvwXzlub6DmKVHGzhwefXG1QGSA&s=10",
+  },
+  {
+    id: "4",
+    title: "Meteora",
+    author: "Linkin Park",
+    imageUrl: "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcSKNeoTxUk1C1NYsqfLxJDMsZLCnb8wipMzymny-IuAAA&s=10",
+  },
+  {
+    id: "5",
+    title: "Awake and alive",
+    author: "Skillet",
+    imageUrl: "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcS-zSfKrJ8rKhrUoDOIA8Nywknya1HC-DihMM0Q_d79Cw&s",
+  },
+];
