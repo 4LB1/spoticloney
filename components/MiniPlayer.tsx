@@ -10,10 +10,14 @@ type MiniPlayerProps = {
 export function MiniPlayer({ title, author, imageUrl, onPress }: MiniPlayerProps) {
   return (
     <Pressable style={styles.container} onPress={onPress}>
-      <Image source={{ uri: imageUrl="https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcTCva-w-oDVHKWpg90Rh8TUnY1_GnzxoDnlLam-8ItqcQ&s=10" }} style={styles.cover} />
+      <Image source={{ uri: imageUrl }} style={styles.cover} />
       <View style={styles.info}>
-        <Text style={styles.title}>{title}</Text>
-        <Text style={styles.author}>{author}</Text>
+        <Text style={styles.title} numberOfLines={1}>
+          {title}
+        </Text>
+        <Text style={styles.author} numberOfLines={1}>
+          {author}
+        </Text>
       </View>
       <Text style={styles.playIcon}>▶</Text>
     </Pressable>
@@ -34,6 +38,7 @@ const styles = StyleSheet.create({
     width: 48,
     height: 48,
     borderRadius: 8,
+    backgroundColor: "#3F3F46",
   },
   info: {
     flex: 1,

@@ -5,15 +5,18 @@ import {
   Image,
   Pressable,
   ScrollView,
+  ActivityIndicator,
   StyleSheet,
   SafeAreaView,
 } from "react-native";
 import type { NativeStackScreenProps } from "@react-navigation/native-stack";
 import { Button } from "../components/Button";
+import { ErrorView } from "../components/ErrorView";
 import { useAuth } from "../contexts/AuthContext";
+import { useFetch } from "../hooks/useFetch";
+import { imageUrl, postJson } from "../api/client";
+import type { Like, NewLike, Track } from "../api/types";
 import type { RootStackParamList } from "../App";
-
-const TRACK_DURATION_SEC = 215; // 3:35
 
 function formatDuration(totalSeconds: number): string {
   const minutes = Math.floor(totalSeconds / 60);
@@ -23,10 +26,38 @@ function formatDuration(totalSeconds: number): string {
 
 type Props = NativeStackScreenProps<RootStackParamList, "Player">;
 
-export function PlayerScreen({ navigation }: Props) {
+export function PlayerScreen({ route, navigation }: Props) {
+  const { id } = route.params;
   const { user } = useAuth();
+  const { data: track, loading, error, reload } = useFetch<Track>(
+    `/tracks/${id}`
+  );
+
   const [isPlaying, setIsPlaying] = useState(false);
   const [repeatCount, setRepeatCount] = useState(1);
+  const [submitting, setSubmitting] = useState(false);
+  const [likeResult, setLikeResult] = useState<Like | null>(null);
+  const [likeError, setLikeError] = useState<string | null>(null);
+
+  if (loading) {
+    return (
+      <SafeAreaView style={styles.safeArea}>
+        <View style={styles.center}>
+          <ActivityIndicator size="large" color="#7F00FF" />
+          <Text style={styles.hint}>Загружаем трек…</Text>
+        </View>
+      </SafeAreaView>
+    );
+  }
+
+  if (error || !track) {
+    const message = error ?? "Трек не найден";
+    return (
+      <SafeAreaView style={styles.safeArea}>
+        <ErrorView message={message} onRetry={reload} />
+      </SafeAreaView>
+    );
+  }
 
   function decrease() {
     setRepeatCount((prev) => Math.max(1, prev - 1));
@@ -36,20 +67,39 @@ export function PlayerScreen({ navigation }: Props) {
     setRepeatCount((prev) => Math.min(10, prev + 1));
   }
 
-  const totalSeconds = TRACK_DURATION_SEC * repeatCount;
+  async function handleAddToLikes() {
+    setSubmitting(true);
+    setLikeError(null);
+    try {
+      const newLike: NewLike = {
+        trackId: id,
+        user: user ?? "гость",
+      };
+      const created = await postJson<Like>("/likes", newLike);
+      setLikeResult(created);
+    } catch (e) {
+      setLikeError(
+        e instanceof Error ? e.message : "Не удалось добавить в «Любимые»"
+      );
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  const totalSeconds = track.durationSec * repeatCount;
   const formattedTotalTime = formatDuration(totalSeconds);
+  const formattedTrackTime = formatDuration(track.durationSec);
 
   return (
     <SafeAreaView style={styles.safeArea}>
       <ScrollView contentContainerStyle={styles.container}>
-        <Image
-          source={{ uri: "https://picsum.photos/id/1011/600" }}
-          style={styles.cover}
-        />
+        <Image source={{ uri: imageUrl(track.imageUrl) }} style={styles.cover} />
 
         <View style={styles.trackMeta}>
-          <Text style={styles.trackTitle}>Follow the Leader</Text>
-          <Text style={styles.trackAuthor}>Korn</Text>
+          <Text style={styles.trackTitle}>{track.title}</Text>
+          <Text style={styles.trackAuthor}>
+            {track.author} · {track.genre}
+          </Text>
         </View>
 
         <View style={styles.progressSection}>
@@ -58,8 +108,8 @@ export function PlayerScreen({ navigation }: Props) {
             <View style={styles.progressThumb} />
           </View>
           <View style={styles.timeRow}>
-            <Text style={styles.timeText}>1:24</Text>
-            <Text style={styles.timeText}>3:35</Text>
+            <Text style={styles.timeText}>0:00</Text>
+            <Text style={styles.timeText}>{formattedTrackTime}</Text>
           </View>
         </View>
 
@@ -72,9 +122,7 @@ export function PlayerScreen({ navigation }: Props) {
             style={styles.playButton}
             onPress={() => setIsPlaying((prev) => !prev)}
           >
-            <Text style={styles.playButtonText}>
-              {isPlaying ? "⏸" : "▶"}
-            </Text>
+            <Text style={styles.playButtonText}>{isPlaying ? "⏸" : "▶"}</Text>
           </Pressable>
 
           <Pressable style={styles.skipButton}>
@@ -82,7 +130,38 @@ export function PlayerScreen({ navigation }: Props) {
           </Pressable>
         </View>
 
-        {/* Карточка очереди повторов (ЛР4) + статус пользователя из AuthContext (ЛР5) */}
+        {/* Главное действие варианта 4: POST /api/likes */}
+        <View style={styles.likeActionBox}>
+          <Button
+            variant="primary"
+            onPress={handleAddToLikes}
+            disabled={submitting}
+          >
+            {submitting ? "Добавляем…" : "Добавить в «Любимые»"}
+          </Button>
+
+          {likeResult ? (
+            <Text style={styles.successText}>
+              Трек «{likeResult.trackTitle}» добавлен в «Любимые» (№{" "}
+              {likeResult.id})
+            </Text>
+          ) : null}
+
+          {likeError ? (
+            <Text style={styles.errorText}>{likeError}</Text>
+          ) : null}
+
+          <View style={styles.historyLinkWrap}>
+            <Button
+              variant="secondary"
+              onPress={() => navigation.navigate("Likes")}
+            >
+              Открыть «Любимые»
+            </Button>
+          </View>
+        </View>
+
+        {/* Карточка очереди повторов + статус пользователя */}
         <View style={styles.queueCard}>
           <Text style={styles.counterLabel}>Повторов в очереди</Text>
 
@@ -155,6 +234,16 @@ const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
     backgroundColor: "#171717",
+  },
+  center: {
+    flex: 1,
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 10,
+  },
+  hint: {
+    color: "#9A9A9A",
+    fontSize: 14,
   },
   container: {
     padding: 20,
@@ -239,6 +328,26 @@ const styles = StyleSheet.create({
     color: "#171717",
     fontSize: 22,
     fontWeight: "700",
+  },
+  likeActionBox: {
+    marginBottom: 20,
+  },
+  successText: {
+    color: "#34D399",
+    fontSize: 13,
+    textAlign: "center",
+    marginTop: 10,
+    fontWeight: "600",
+  },
+  errorText: {
+    color: "#F87171",
+    fontSize: 13,
+    textAlign: "center",
+    marginTop: 10,
+    fontWeight: "600",
+  },
+  historyLinkWrap: {
+    marginTop: 10,
   },
   queueCard: {
     backgroundColor: "#262626",

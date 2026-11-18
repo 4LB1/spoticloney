@@ -5,12 +5,14 @@ import { HomeScreen } from "./screens/HomeScreen";
 import { SearchScreen } from "./screens/SearchScreen";
 import { PlayerScreen } from "./screens/PlayerScreen";
 import { LoginScreen } from "./screens/LoginScreen";
+import { LikesScreen } from "./screens/LikesScreen";
 
 export type RootStackParamList = {
   Home: undefined;
   Search: undefined;
-  Player: undefined;
+  Player: { id: number };
   Login: undefined;
+  Likes: undefined;
 };
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
@@ -46,6 +48,11 @@ export default function App() {
             name="Login"
             component={LoginScreen}
             options={{ title: "Вход" }}
+          />
+          <Stack.Screen
+            name="Likes"
+            component={LikesScreen}
+            options={{ title: "Любимые треки" }}
           />
         </Stack.Navigator>
       </NavigationContainer>
